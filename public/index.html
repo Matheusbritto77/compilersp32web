@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Web Flasher - Compile & Flash sem instalar nada!</title>
+    <meta name="description" content="Compile e grave firmware ESP32 diretamente do navegador. Sem precisar instalar ESP-IDF!">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <!-- ESP Web Tools para flash -->
+    <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div class="logo-text">
+                        <h1>ESP32 Web Flasher</h1>
+                        <span class="tagline">Compile & Flash sem instalar nada!</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <a href="https://github.com" target="_blank" class="btn btn-ghost">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                        </svg>
+                        GitHub
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Upload Section -->
+            <section class="card upload-section">
+                <div class="card-header">
+                    <h2>
+                        <span class="step-number">1</span>
+                        Upload do Projeto
+                    </h2>
+                    <p class="card-description">Envie um arquivo ZIP contendo seu projeto ESP-IDF</p>
+                </div>
+                <div class="card-body">
+                    <div class="upload-zone" id="uploadZone">
+                        <input type="file" id="fileInput" accept=".zip" hidden>
+                        <div class="upload-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                        </div>
+                        <p class="upload-text">Arraste seu arquivo <strong>.zip</strong> aqui</p>
+                        <p class="upload-subtext">ou clique para selecionar</p>
+                        <div class="file-info" id="fileInfo" style="display: none;">
+                            <span class="file-name" id="fileName"></span>
+                            <button class="btn-remove" id="removeFile">×</button>
+                        </div>
+                    </div>
+                    
+                    <div class="build-options">
+                        <div class="option-group">
+                            <label for="targetSelect">Target ESP32:</label>
+                            <select id="targetSelect" class="select-input">
+                                <option value="esp32">ESP32</option>
+                                <option value="esp32s2">ESP32-S2</option>
+                                <option value="esp32s3">ESP32-S3</option>
+                                <option value="esp32c3">ESP32-C3</option>
+                                <option value="esp32c6">ESP32-C6</option>
+                                <option value="esp32h2">ESP32-H2</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-primary btn-large" id="buildBtn" disabled>
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        Compilar Projeto
+                    </button>
+                </div>
+            </section>
+
+            <!-- Build Progress Section -->
+            <section class="card build-section" id="buildSection" style="display: none;">
+                <div class="card-header">
+                    <h2>
+                        <span class="step-number">2</span>
+                        Compilação
+                    </h2>
+                    <div class="build-status" id="buildStatus">
+                        <span class="status-indicator status-building"></span>
+                        <span class="status-text">Compilando...</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="progress-container">
+                        <div class="progress-bar" id="progressBar">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <span class="progress-text" id="progressText">Iniciando...</span>
+                    </div>
+                    
+                    <div class="terminal" id="terminal">
+                        <div class="terminal-header">
+                            <div class="terminal-dots">
+                                <span></span><span></span><span></span>
+                            </div>
+                            <span class="terminal-title">Build Output</span>
+                            <button class="btn-icon" id="clearTerminal" title="Limpar">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="terminal-body" id="terminalBody">
+                            <pre id="terminalOutput"></pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Flash Section -->
+            <section class="card flash-section" id="flashSection" style="display: none;">
+                <div class="card-header">
+                    <h2>
+                        <span class="step-number">3</span>
+                        Flash no ESP32
+                    </h2>
+                    <p class="card-description">Conecte seu ESP32 e grave o firmware compilado</p>
+                </div>
+                <div class="card-body">
+                    <div class="flash-info">
+                        <div class="info-box success">
+                            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                                <polyline points="22 4 12 14.01 9 11.01"/>
+                            </svg>
+                            <div>
+                                <strong>Build concluído com sucesso!</strong>
+                                <p id="buildTime">Tempo: --</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="binaries-list" id="binariesList">
+                        <!-- Será preenchido dinamicamente -->
+                    </div>
+
+                    <div class="flash-container">
+                        <div class="flash-instructions">
+                            <h3>📟 Como gravar:</h3>
+                            <ol>
+                                <li>Conecte o ESP32 via USB</li>
+                                <li>Clique em "Conectar & Flash"</li>
+                                <li>Selecione a porta serial</li>
+                                <li>Aguarde a gravação completar</li>
+                            </ol>
+                        </div>
+                        
+                        <div class="flash-actions">
+                            <esp-web-install-button id="espInstallButton">
+                                <button slot="activate" class="btn btn-success btn-large">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                                    </svg>
+                                    Conectar & Flash
+                                </button>
+                                <span slot="unsupported">
+                                    <div class="warning-box">
+                                        ⚠️ Seu navegador não suporta Web Serial API. 
+                                        Use Chrome, Edge ou Opera.
+                                    </div>
+                                </span>
+                            </esp-web-install-button>
+                            
+                            <button class="btn btn-outline" id="downloadAllBtn">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                Download Binários
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Recent Builds -->
+            <section class="card recent-builds" id="recentBuilds">
+                <div class="card-header">
+                    <h2>🕐 Builds Recentes</h2>
+                </div>
+                <div class="card-body">
+                    <div class="builds-list" id="buildsList">
+                        <p class="empty-state">Nenhum build recente</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>ESP32 Web Flasher © 2025 - Powered by ESP-IDF & Web Serial API</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
