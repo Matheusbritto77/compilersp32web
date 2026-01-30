@@ -173,14 +173,56 @@ async function buildEspIdf(buildId, projectPath, target = 'esp32') {
                         }
                     }
 
-                    // Ler flash_args se existir
+                    // Ler flash_args para extrair endereços reais
                     const flashArgsPath = path.join(buildDir, 'flash_args');
-                    let flashArgs = null;
-                    if (existsSync(flashArgsPath)) {
-                        flashArgs = await fs.readFile(flashArgsPath, 'utf-8');
+                    let flashArgs = {};
+                    try {
+                        if (existsSync(flashArgsPath)) {
+                            const content = await fs.readFile(flashArgsPath, 'utf-8');
+                            const lines = content.split('\n');
+                            lines.forEach(line => {
+                                const match = line.match(/(0x[0-9a-fA-F]+)\s+(.+)/);
+                                if (match) flashArgs[path.basename(match[2].trim())] = match[1];
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Erro ao ler flash_args:', e);
                     }
 
-                    resolve({ success: true, binaries, flashArgs, output });
+                    // Montar manifesto para o ESP Web Tools
+                    const manifest = {
+                        name: "ESP32 Web Build",
+                        builds: [{
+                            chipFamily: target.toUpperCase().replace('-', ''),
+                            parts: []
+                        }]
+                    };
+
+                    for (const [name, url] of Object.entries(binaries)) {
+                        let offset = flashArgs[name];
+                        if (!offset) {
+                            if (name.includes('bootloader')) offset = "0x1000";
+                            else if (name.includes('partition')) offset = "0x8000";
+                            else if (name.endsWith('.bin')) offset = "0x10000";
+                        }
+
+                        if (offset) {
+                            manifest.builds[0].parts.push({
+                                path: name,
+                                offset: parseInt(offset, 16)
+                            });
+                        }
+                    }
+
+                    // Salvar manifest.json na pasta do build
+                    await fs.writeFile(path.join(buildPath, 'manifest.json'), JSON.stringify(manifest, null, 2));
+
+                    resolve({
+                        success: true,
+                        binaries,
+                        manifestUrl: `/builds/${buildId}/manifest.json`,
+                        output
+                    });
                 } catch (e) {
                     reject(new Error(`Erro ao processar binários: ${e.message}`));
                 }

@@ -151,24 +151,19 @@ function onBuildSuccess(data) {
     elements.flashSection.style.display = 'block';
     elements.binariesList.innerHTML = '';
 
-    const manifest = {
-        name: "ESP32 Firmware",
-        builds: [{ chipFamily: data.target.toUpperCase().replace('-', ''), parts: [] }]
-    };
-
-    const addrMap = { 'bootloader.bin': 0x1000, 'partition-table.bin': 0x8000, 'project.bin': 0x10000 };
-
+    // Listar binários para download manual
     Object.entries(data.binaries).forEach(([name, url]) => {
         const item = document.createElement('div');
         item.className = 'binary-item';
         item.innerHTML = `<span>${name}</span><a href="${url}" download class="btn btn-icon">⬇️</a>`;
         elements.binariesList.appendChild(item);
-
-        let addr = addrMap[name] || (name.endsWith('.bin') && !name.includes('bootloader') && !name.includes('partition') ? 0x10000 : null);
-        if (addr !== null) manifest.builds[0].parts.push({ path: window.location.origin + url, offset: addr });
     });
 
-    elements.espInstallButton.manifest = manifest;
+    // Usar a URL do manifest.json gerada pelo servidor
+    if (data.manifestUrl) {
+        elements.espInstallButton.manifest = window.location.origin + data.manifestUrl;
+    }
+
     loadRecentBuilds();
     elements.buildBtn.disabled = false;
 }
