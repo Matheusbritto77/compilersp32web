@@ -193,7 +193,7 @@ async function buildEspIdf(buildId, projectPath, target = 'esp32') {
                     const manifest = {
                         name: "ESP32 Web Build",
                         builds: [{
-                            chipFamily: target.toUpperCase().replace('-', ''),
+                            chipFamily: target.toUpperCase(), // Mantém o hífen (ex: ESP32-S3)
                             parts: []
                         }]
                     };

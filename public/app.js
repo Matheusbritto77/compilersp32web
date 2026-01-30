@@ -75,6 +75,13 @@ function setupEventListeners() {
     elements.connectSerialBtn.addEventListener('click', toggleSerial);
 
     // ESC Web Tools Events
+    elements.espInstallButton.addEventListener('activate', async () => {
+        if (serialPort) {
+            appendLog('\n🔌 Desconectando monitor serial para liberar a porta...', 'info');
+            await disconnectSerial();
+        }
+    });
+
     elements.espInstallButton.addEventListener('install-success', () => {
         appendLog('\n✅ Gravação concluída! Abrindo monitor serial...', 'success');
         elements.monitorSection.style.display = 'block';
