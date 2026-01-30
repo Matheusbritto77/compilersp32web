@@ -26,11 +26,11 @@ COPY . .
 RUN mkdir -p /app/uploads /app/builds /app/temp
 
 # Porta do servidor
-EXPOSE 3000
+EXPOSE 80
 
 # Variáveis de ambiente
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=80
 ENV UPLOAD_DIR=/app/uploads
 ENV BUILD_DIR=/app/builds
 

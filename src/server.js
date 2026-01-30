@@ -15,7 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 80;
 
 // Diretórios
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '../uploads');
@@ -38,11 +38,11 @@ const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, UPLOAD_DIR),
     filename: (req, file, cb) => cb(null, `${uuidv4()}.zip`)
 });
-const upload = multer({ 
+const upload = multer({
     storage,
     limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
     fileFilter: (req, file, cb) => {
-        if (file.mimetype === 'application/zip' || 
+        if (file.mimetype === 'application/zip' ||
             file.mimetype === 'application/x-zip-compressed' ||
             file.originalname.endsWith('.zip')) {
             cb(null, true);
@@ -78,22 +78,22 @@ function broadcastLog(buildId, message, type = 'info') {
 // Detectar tipo de projeto
 async function detectProjectType(projectPath) {
     const files = await fs.readdir(projectPath);
-    
+
     // ESP-IDF project
     if (files.includes('CMakeLists.txt') && files.includes('main')) {
         return 'esp-idf';
     }
-    
+
     // PlatformIO project
     if (files.includes('platformio.ini')) {
         return 'platformio';
     }
-    
+
     // Arduino project (sketch)
     if (files.some(f => f.endsWith('.ino'))) {
         return 'arduino';
     }
-    
+
     // Verificar se tem CMakeLists.txt com idf
     if (files.includes('CMakeLists.txt')) {
         try {
@@ -101,9 +101,9 @@ async function detectProjectType(projectPath) {
             if (cmake.includes('idf_component_register') || cmake.includes('project(')) {
                 return 'esp-idf';
             }
-        } catch (e) {}
+        } catch (e) { }
     }
-    
+
     return 'unknown';
 }
 
@@ -111,13 +111,13 @@ async function detectProjectType(projectPath) {
 async function buildEspIdf(buildId, projectPath, target = 'esp32') {
     return new Promise((resolve, reject) => {
         const buildPath = path.join(BUILD_DIR, buildId);
-        
+
         broadcastLog(buildId, `🔧 Iniciando build ESP-IDF para ${target}...`, 'info');
         broadcastLog(buildId, `📁 Projeto: ${projectPath}`, 'info');
-        
+
         // Comando de build ESP-IDF
         const buildCmd = `source /opt/esp/idf/export.sh && cd "${projectPath}" && idf.py set-target ${target} && idf.py build`;
-        
+
         const proc = spawn('bash', ['-c', buildCmd], {
             cwd: projectPath,
             env: { ...process.env, IDF_PATH: '/opt/esp/idf' }
@@ -141,18 +141,18 @@ async function buildEspIdf(buildId, projectPath, target = 'esp32') {
         proc.on('close', async (code) => {
             if (code === 0) {
                 broadcastLog(buildId, '✅ Build concluído com sucesso!', 'success');
-                
+
                 // Encontrar binários gerados
                 const buildDir = path.join(projectPath, 'build');
                 try {
                     const files = await fs.readdir(buildDir);
                     const binFiles = files.filter(f => f.endsWith('.bin'));
-                    
+
                     // Copiar binários para diretório de builds
                     if (!existsSync(buildPath)) {
                         mkdirSync(buildPath, { recursive: true });
                     }
-                    
+
                     const binaries = {};
                     for (const bin of binFiles) {
                         const src = path.join(buildDir, bin);
@@ -160,7 +160,7 @@ async function buildEspIdf(buildId, projectPath, target = 'esp32') {
                         await fs.copyFile(src, dest);
                         binaries[bin] = `/builds/${buildId}/${bin}`;
                     }
-                    
+
                     // Copiar também arquivos importantes para flash
                     const flashFiles = ['bootloader/bootloader.bin', 'partition_table/partition-table.bin'];
                     for (const ff of flashFiles) {
@@ -172,14 +172,14 @@ async function buildEspIdf(buildId, projectPath, target = 'esp32') {
                             binaries[destName] = `/builds/${buildId}/${destName}`;
                         }
                     }
-                    
+
                     // Ler flash_args se existir
                     const flashArgsPath = path.join(buildDir, 'flash_args');
                     let flashArgs = null;
                     if (existsSync(flashArgsPath)) {
                         flashArgs = await fs.readFile(flashArgsPath, 'utf-8');
                     }
-                    
+
                     resolve({ success: true, binaries, flashArgs, output });
                 } catch (e) {
                     reject(new Error(`Erro ao processar binários: ${e.message}`));
@@ -237,41 +237,41 @@ app.post('/api/upload', upload.single('project'), async (req, res) => {
         broadcastLog(buildId, `🔍 Tipo de projeto detectado: ${projectType}`, 'info');
 
         if (projectType === 'unknown') {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 error: 'Tipo de projeto não reconhecido. Certifique-se de que é um projeto ESP-IDF válido.',
-                buildId 
+                buildId
             });
         }
 
         // Iniciar build
-        builds.set(buildId, { 
-            status: 'building', 
-            projectType, 
-            target,
-            startTime: Date.now(),
-            projectPath 
-        });
-
-        res.json({ 
-            buildId, 
+        builds.set(buildId, {
+            status: 'building',
             projectType,
             target,
-            message: 'Build iniciado! Acompanhe o progresso via WebSocket.' 
+            startTime: Date.now(),
+            projectPath
+        });
+
+        res.json({
+            buildId,
+            projectType,
+            target,
+            message: 'Build iniciado! Acompanhe o progresso via WebSocket.'
         });
 
         // Build assíncrono
         try {
             const result = await buildEspIdf(buildId, projectPath, target);
-            builds.set(buildId, { 
-                ...builds.get(buildId), 
-                status: 'success', 
+            builds.set(buildId, {
+                ...builds.get(buildId),
+                status: 'success',
                 ...result,
                 endTime: Date.now()
             });
         } catch (error) {
-            builds.set(buildId, { 
-                ...builds.get(buildId), 
-                status: 'failed', 
+            builds.set(buildId, {
+                ...builds.get(buildId),
+                status: 'failed',
                 error: error.message,
                 endTime: Date.now()
             });
@@ -308,20 +308,20 @@ app.use('/builds', express.static(BUILD_DIR));
 app.get('/api/download/:buildId/:filename', (req, res) => {
     const { buildId, filename } = req.params;
     const filePath = path.join(BUILD_DIR, buildId, filename);
-    
+
     if (!existsSync(filePath)) {
         return res.status(404).json({ error: 'Arquivo não encontrado' });
     }
-    
+
     res.download(filePath);
 });
 
 // Health check
 app.get('/api/health', (req, res) => {
-    res.json({ 
-        status: 'ok', 
+    res.json({
+        status: 'ok',
         uptime: process.uptime(),
-        builds: builds.size 
+        builds: builds.size
     });
 });
 
