@@ -376,9 +376,13 @@ async function selectTarget(target) {
 // ============================================
 
 let lastBuildManifest = null;
+let lastBuildId = null;
 
 function updateFlashUI(build) {
     if (!build.binaries) return;
+
+    // Salvar buildId
+    lastBuildId = build.id || currentBuildId;
 
     // Update binaries grid
     const grid = document.getElementById('binariesGrid');
@@ -394,17 +398,17 @@ function updateFlashUI(build) {
         grid.appendChild(item);
     });
 
-    // Setup ESP Web Tools with correct absolute URL
-    if (build.manifestUrl) {
-        // Construir URL absoluta para o manifest
-        const manifestFullUrl = new URL(build.manifestUrl, window.location.origin).href;
-        lastBuildManifest = manifestFullUrl;
+    // Usar rota de API para manifest (mais confiável)
+    if (build.manifestUrl && lastBuildId) {
+        // Usar nova rota de API em vez do arquivo estático
+        const manifestApiUrl = `${window.location.origin}/api/manifest/${lastBuildId}`;
+        lastBuildManifest = manifestApiUrl;
 
-        console.log('Manifest URL:', manifestFullUrl);
+        console.log('Manifest API URL:', manifestApiUrl);
 
         const flashButtons = document.querySelectorAll('esp-web-install-button');
         flashButtons.forEach(btn => {
-            btn.setAttribute('manifest', manifestFullUrl);
+            btn.setAttribute('manifest', manifestApiUrl);
             btn.style.display = 'inline-block';
 
             // Adicionar listener para desconectar serial antes de flashar
@@ -418,7 +422,8 @@ function updateFlashUI(build) {
             }, { once: false });
         });
 
-        appendTerminal(`📦 Flash pronto! Manifest: ${manifestFullUrl}\n`, 'success');
+        appendTerminal(`📦 Flash pronto!\n`, 'success');
+        appendTerminal(`   Manifest: ${manifestApiUrl}\n`, 'info');
     }
 }
 
@@ -871,7 +876,7 @@ async function connectSerial() {
 
         document.getElementById('serialInput').disabled = false;
         document.getElementById('sendSerial').disabled = false;
-        document.getElementById('connectionStatus').innerHTML = '<span class="dot online"></span><span>Conectado</span>';
+        document.getElementById('serialConnectionStatus').innerHTML = '<span class="dot online"></span><span>Conectado</span>';
         btn.textContent = '🔌 Desconectar';
 
         appendMonitor(`✅ Conectado! Baud rate: ${baudRate}\n`);
@@ -966,7 +971,7 @@ async function disconnectSerial() {
 
         document.getElementById('serialInput').disabled = true;
         document.getElementById('sendSerial').disabled = true;
-        document.getElementById('connectionStatus').innerHTML = '<span class="dot offline"></span><span>Desconectado</span>';
+        document.getElementById('serialConnectionStatus').innerHTML = '<span class="dot offline"></span><span>Desconectado</span>';
 
         appendMonitor('\n🔌 Desconectado\n');
     } catch (err) {

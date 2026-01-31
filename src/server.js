@@ -42,8 +42,33 @@ app.use('/builds', (req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type');
+    res.header('Cache-Control', 'no-cache');
     next();
 }, express.static(BUILD_DIR));
+
+// Rota específica para manifest (mais confiável)
+app.get('/api/manifest/:buildId', async (req, res) => {
+    try {
+        const manifestPath = path.join(BUILD_DIR, req.params.buildId, 'manifest.json');
+        if (!existsSync(manifestPath)) {
+            return res.status(404).json({ error: 'Manifest não encontrado' });
+        }
+
+        const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf-8'));
+
+        // Ajustar paths para URLs absolutas
+        manifest.builds[0].parts = manifest.builds[0].parts.map(part => ({
+            ...part,
+            path: `/builds/${req.params.buildId}/${part.path}`
+        }));
+
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Content-Type', 'application/json');
+        res.json(manifest);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 app.use(express.static(path.join(__dirname, '../public')));
 
@@ -358,6 +383,7 @@ app.post('/api/project/:projectId/build', async (req, res) => {
 
         builds.set(buildId, {
             ...builds.get(buildId),
+            id: buildId,  // Adicionar ID para o frontend usar
             status: 'success',
             binaries,
             manifestUrl: `/builds/${buildId}/manifest.json`,
