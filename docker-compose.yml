@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  esp32-ide:
+    build: .
+    container_name: esp32-web-ide
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      # Persistir projetos e builds
+      - esp32-projects:/app/projects
+      - esp32-builds:/app/builds
+      - esp32-uploads:/app/uploads
+    environment:
+      - NODE_ENV=production
+      - PORT=80
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  esp32-projects:
+  esp32-builds:
+  esp32-uploads:

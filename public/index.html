@@ -4,9 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 Web Flasher - Compile & Flash sem instalar nada!</title>
-    <meta name="description"
-        content="Compile e grave firmware ESP32 diretamente do navegador. Sem precisar instalar ESP-IDF!">
+    <title>ESP32 Web IDE - Ambiente Completo de Desenvolvimento</title>
+    <meta name="description" content="IDE completa para ESP32: compile, flash, monitor, configure - tudo no navegador!">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -15,218 +14,346 @@
     <link rel="stylesheet" href="styles.css">
     <!-- ESP Web Tools para flash -->
     <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+    <!-- Monaco Editor para code editor -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
 </head>
 
 <body>
     <div class="app-container">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-content">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
                 <div class="logo">
-                    <div class="logo-icon">
-                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2"
-                                stroke-linecap="round" stroke-linejoin="round" />
-                            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round" />
-                            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round" />
-                        </svg>
-                    </div>
-                    <div class="logo-text">
-                        <h1>ESP32 Web Flasher</h1>
-                        <span class="tagline">Compile & Flash sem instalar nada!</span>
-                    </div>
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" />
+                        <path d="M2 17L12 22L22 17" />
+                        <path d="M2 12L12 17L22 12" />
+                    </svg>
+                    <span>ESP32 IDE</span>
                 </div>
-                <div class="header-actions">
-                    <a href="https://github.com" target="_blank" class="btn btn-ghost">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                            <path
-                                d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-                        </svg>
-                        GitHub
-                    </a>
+                <button class="btn-icon" id="toggleSidebar">☰</button>
+            </div>
+
+            <!-- Project Section -->
+            <div class="sidebar-section">
+                <h3>📁 Projeto</h3>
+                <div class="project-info" id="projectInfo" style="display: none;">
+                    <div class="project-name" id="currentProjectName">-</div>
+                    <div class="project-target" id="currentTarget">Target: -</div>
+                </div>
+                <div class="upload-mini" id="uploadMini">
+                    <input type="file" id="fileInput" accept=".zip" hidden>
+                    <button class="btn btn-primary btn-block" id="uploadBtn">
+                        📤 Upload Projeto (.zip)
+                    </button>
                 </div>
             </div>
-        </header>
+
+            <!-- Files Section -->
+            <div class="sidebar-section" id="filesSection" style="display: none;">
+                <h3>📄 Arquivos</h3>
+                <div class="file-tree" id="fileTree"></div>
+            </div>
+
+            <!-- Actions Section -->
+            <div class="sidebar-section">
+                <h3>⚡ Ações</h3>
+                <div class="action-buttons">
+                    <button class="btn btn-action" id="btnSetTarget" disabled>
+                        🎯 Set Target
+                    </button>
+                    <button class="btn btn-action btn-success" id="btnBuild" disabled>
+                        ▶️ Build
+                    </button>
+                    <button class="btn btn-action" id="btnClean" disabled>
+                        🧹 Clean
+                    </button>
+                    <button class="btn btn-action" id="btnFlash" disabled>
+                        ⚡ Flash
+                    </button>
+                    <button class="btn btn-action" id="btnMonitor" disabled>
+                        📟 Monitor
+                    </button>
+                </div>
+            </div>
+
+            <!-- Analysis Section -->
+            <div class="sidebar-section">
+                <h3>📊 Análise</h3>
+                <div class="action-buttons">
+                    <button class="btn btn-action" id="btnSize" disabled>
+                        📏 Size
+                    </button>
+                    <button class="btn btn-action" id="btnSizeComponents" disabled>
+                        📦 Size Components
+                    </button>
+                    <button class="btn btn-action" id="btnSizeFiles" disabled>
+                        📄 Size Files
+                    </button>
+                </div>
+            </div>
+
+            <!-- Configuration Section -->
+            <div class="sidebar-section">
+                <h3>⚙️ Configuração</h3>
+                <div class="action-buttons">
+                    <button class="btn btn-action" id="btnMenuconfig" disabled>
+                        🔧 sdkconfig
+                    </button>
+                    <button class="btn btn-action" id="btnPartitions" disabled>
+                        💾 Partitions
+                    </button>
+                    <button class="btn btn-action" id="btnReconfigure" disabled>
+                        🔄 Reconfigure
+                    </button>
+                </div>
+            </div>
+        </aside>
 
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Upload Section -->
-            <section class="card upload-section">
-                <div class="card-header">
-                    <h2>
-                        <span class="step-number">1</span>
-                        Upload do Projeto
-                    </h2>
-                    <p class="card-description">Envie um arquivo ZIP contendo seu projeto ESP-IDF</p>
-                </div>
-                <div class="card-body">
-                    <div class="upload-zone" id="uploadZone">
-                        <input type="file" id="fileInput" accept=".zip" hidden>
-                        <div class="upload-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                                <polyline points="17 8 12 3 7 8" />
-                                <line x1="12" y1="3" x2="12" y2="15" />
-                            </svg>
-                        </div>
-                        <p class="upload-text">Arraste seu arquivo <strong>.zip</strong> aqui</p>
-                        <p class="upload-subtext">ou clique para selecionar</p>
-                        <div class="file-info" id="fileInfo" style="display: none;">
-                            <span class="file-name" id="fileName"></span>
-                            <button class="btn-remove" id="removeFile">×</button>
-                        </div>
-                    </div>
-
-                    <div class="build-options">
-                        <div class="option-group">
-                            <label for="targetSelect">Target ESP32:</label>
-                            <select id="targetSelect" class="select-input">
-                                <option value="esp32">ESP32</option>
-                                <option value="esp32s2">ESP32-S2</option>
-                                <option value="esp32s3">ESP32-S3</option>
-                                <option value="esp32c3">ESP32-C3</option>
-                                <option value="esp32c6">ESP32-C6</option>
-                                <option value="esp32h2">ESP32-H2</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <button class="btn btn-primary btn-large" id="buildBtn" disabled>
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <polygon points="5 3 19 12 5 21 5 3" />
-                        </svg>
-                        Compilar Projeto
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <select id="targetSelect" class="select-input">
+                        <option value="esp32">ESP32</option>
+                        <option value="esp32s2">ESP32-S2</option>
+                        <option value="esp32s3">ESP32-S3</option>
+                        <option value="esp32c3">ESP32-C3 (RISC-V)</option>
+                        <option value="esp32c6">ESP32-C6</option>
+                        <option value="esp32h2">ESP32-H2</option>
+                    </select>
+                    <button class="btn btn-primary" id="btnQuickBuild" disabled>
+                        ▶️ Build
                     </button>
+                    <esp-web-install-button id="espInstallButton" style="display: none;">
+                        <button slot="activate" class="btn btn-success">⚡ Flash</button>
+                    </esp-web-install-button>
                 </div>
-            </section>
-
-            <!-- Build Progress Section -->
-            <section class="card build-section" id="buildSection" style="display: none;">
-                <div class="card-header">
-                    <h2>
-                        <span class="step-number">2</span>
-                        Compilação
-                    </h2>
-                    <div class="build-status" id="buildStatus">
-                        <span class="status-indicator status-building"></span>
-                        <span class="status-text">Compilando...</span>
+                <div class="toolbar-right">
+                    <div class="status-indicator" id="statusIndicator">
+                        <span class="dot"></span>
+                        <span class="text">Pronto</span>
                     </div>
                 </div>
-                <div class="card-body">
-                    <div class="progress-container">
-                        <div class="progress-bar" id="progressBar">
-                            <div class="progress-fill"></div>
-                        </div>
-                        <span class="progress-text" id="progressText">Iniciando...</span>
-                    </div>
+            </div>
 
-                    <div class="terminal" id="terminal">
+            <!-- Tabs -->
+            <div class="tabs" id="tabs">
+                <button class="tab active" data-tab="terminal">📟 Terminal</button>
+                <button class="tab" data-tab="editor">📝 Editor</button>
+                <button class="tab" data-tab="config">⚙️ Config</button>
+                <button class="tab" data-tab="partitions">💾 Partições</button>
+                <button class="tab" data-tab="flash">⚡ Flash</button>
+                <button class="tab" data-tab="monitor">📟 Monitor Serial</button>
+            </div>
+
+            <!-- Tab Contents -->
+            <div class="tab-contents">
+                <!-- Terminal Tab -->
+                <div class="tab-content active" id="tab-terminal">
+                    <div class="terminal">
                         <div class="terminal-header">
                             <div class="terminal-dots">
                                 <span></span><span></span><span></span>
                             </div>
                             <span class="terminal-title">Build Output</span>
-                            <button class="btn-icon" id="clearTerminal" title="Limpar">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
-                                    stroke-width="2">
-                                    <polyline points="3 6 5 6 21 6" />
-                                    <path
-                                        d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-                                </svg>
-                            </button>
+                            <button class="btn-icon" id="clearTerminal" title="Limpar">🗑️</button>
                         </div>
                         <div class="terminal-body" id="terminalBody">
-                            <pre id="terminalOutput"></pre>
+                            <pre id="terminalOutput">ESP32 Web IDE - Aguardando projeto...
+
+Funcionalidades disponíveis:
+• Build / Compilação
+• Flash via Web Serial
+• Monitor Serial
+• Editor de Código
+• Configuração (sdkconfig)
+• Editor de Partições
+• Análise de Tamanho
+
+Para começar, faça upload de um projeto ESP-IDF (.zip)
+</pre>
                         </div>
                     </div>
                 </div>
-            </section>
 
-            <!-- Flash Section -->
-            <section class="card flash-section" id="flashSection" style="display: none;">
-                <div class="card-header">
-                    <h2>
-                        <span class="step-number">3</span>
-                        Flash no ESP32
-                    </h2>
-                    <div id="deviceInfoBadge" class="device-badge" style="display: none;">
-                        <span class="pulse-icon"></span>
-                        <span id="connectedChipName">Conectado</span>
+                <!-- Editor Tab -->
+                <div class="tab-content" id="tab-editor">
+                    <div class="editor-container">
+                        <div class="editor-tabs" id="editorTabs">
+                            <span class="no-file">Nenhum arquivo aberto</span>
+                        </div>
+                        <div id="monacoEditor" class="monaco-editor-container"></div>
                     </div>
                 </div>
-                <div class="card-body">
-                    <div class="flash-layout">
-                        <div class="flash-main">
-                            <div class="binaries-list" id="binariesList"></div>
 
-                            <div class="flash-actions">
-                                <esp-web-install-button id="espInstallButton">
+                <!-- Config Tab -->
+                <div class="tab-content" id="tab-config">
+                    <div class="config-container">
+                        <div class="config-header">
+                            <h2>⚙️ SDK Configuration (sdkconfig)</h2>
+                            <div class="config-actions">
+                                <input type="text" id="configSearch" placeholder="Buscar configuração..."
+                                    class="input-search">
+                                <button class="btn btn-primary" id="saveConfig">💾 Salvar</button>
+                            </div>
+                        </div>
+                        <div class="config-list" id="configList">
+                            <p class="placeholder">Carregue um projeto para ver as configurações</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Partitions Tab -->
+                <div class="tab-content" id="tab-partitions">
+                    <div class="partitions-container">
+                        <div class="partitions-header">
+                            <h2>💾 Tabela de Partições</h2>
+                            <div class="partitions-actions">
+                                <button class="btn btn-outline" id="addPartition">➕ Adicionar</button>
+                                <button class="btn btn-primary" id="savePartitions">💾 Salvar</button>
+                            </div>
+                        </div>
+                        <div class="partitions-visual" id="partitionsVisual"></div>
+                        <table class="partitions-table" id="partitionsTable">
+                            <thead>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Tipo</th>
+                                    <th>SubTipo</th>
+                                    <th>Offset</th>
+                                    <th>Tamanho</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="partitionsBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Flash Tab -->
+                <div class="tab-content" id="tab-flash">
+                    <div class="flash-container">
+                        <div class="flash-header">
+                            <h2>⚡ Flash Manager</h2>
+                        </div>
+                        <div class="flash-content">
+                            <div class="flash-section">
+                                <h3>📦 Binários Disponíveis</h3>
+                                <div class="binaries-grid" id="binariesGrid">
+                                    <p class="placeholder">Faça build do projeto primeiro</p>
+                                </div>
+                            </div>
+                            <div class="flash-section">
+                                <h3>🔌 Conexão</h3>
+                                <div class="connection-status" id="connectionStatus">
+                                    <span class="dot offline"></span>
+                                    <span>Desconectado</span>
+                                </div>
+                                <div class="flash-options">
+                                    <label>
+                                        <input type="checkbox" id="eraseFlash">
+                                        Apagar flash antes de gravar
+                                    </label>
+                                    <label>
+                                        <input type="checkbox" id="verifyFlash" checked>
+                                        Verificar após gravar
+                                    </label>
+                                </div>
+                                <esp-web-install-button id="mainFlashButton">
                                     <button slot="activate" class="btn btn-success btn-large">
-                                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
-                                            stroke="currentColor" stroke-width="2">
-                                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                                        </svg>
-                                        Gravar no ESP32
+                                        ⚡ Gravar no ESP32
                                     </button>
                                 </esp-web-install-button>
                             </div>
                         </div>
+                    </div>
+                </div>
 
-                        <div class="device-details" id="deviceDetails" style="display: none;">
-                            <h3>📋 Info do Chip</h3>
-                            <div class="info-grid">
-                                <div class="info-item"><span>Chip:</span> <strong id="infoChip">--</strong></div>
-                                <div class="info-item"><span>MAC:</span> <strong id="infoMac">--</strong></div>
-                                <div class="info-item"><span>Features:</span> <strong id="infoFeatures">--</strong>
-                                </div>
+                <!-- Monitor Tab -->
+                <div class="tab-content" id="tab-monitor">
+                    <div class="monitor-container">
+                        <div class="monitor-header">
+                            <h2>📟 Monitor Serial</h2>
+                            <div class="monitor-controls">
+                                <select id="baudRate" class="select-input">
+                                    <option value="9600">9600 bps</option>
+                                    <option value="115200" selected>115200 bps</option>
+                                    <option value="230400">230400 bps</option>
+                                    <option value="460800">460800 bps</option>
+                                    <option value="921600">921600 bps</option>
+                                    <option value="2000000">2000000 bps</option>
+                                </select>
+                                <button class="btn btn-primary" id="connectSerial">🔌 Conectar</button>
+                                <button class="btn btn-outline" id="clearMonitor">🗑️ Limpar</button>
+                                <button class="btn btn-outline" id="downloadLogs">📥 Download</button>
+                                <label class="toggle">
+                                    <input type="checkbox" id="autoScroll" checked>
+                                    Auto-scroll
+                                </label>
+                                <label class="toggle">
+                                    <input type="checkbox" id="showTimestamp">
+                                    Timestamp
+                                </label>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Serial Monitor Section -->
-            <section class="card monitor-section" id="monitorSection" style="display: none;">
-                <div class="card-header">
-                    <h2>📟 Monitor Serial</h2>
-                    <div class="monitor-controls">
-                        <select id="baudRate" class="select-input sm">
-                            <option value="115200">115200 bps</option>
-                            <option value="921600">921600 bps</option>
-                        </select>
-                        <button class="btn btn-primary sm" id="connectSerialBtn">Conectar Monitor</button>
-                        <button class="btn btn-outline sm" id="clearMonitorBtn">Limpar</button>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="terminal monitor-terminal">
-                        <div class="terminal-body" id="monitorBody">
-                            <pre id="monitorOutput"></pre>
+                        <div class="terminal monitor-terminal">
+                            <div class="terminal-body" id="monitorBody">
+                                <pre id="monitorOutput">Clique em "Conectar" para iniciar o monitor serial...</pre>
+                            </div>
+                        </div>
+                        <div class="monitor-input">
+                            <input type="text" id="serialInput" placeholder="Digite comando e pressione Enter..."
+                                disabled>
+                            <button class="btn btn-primary" id="sendSerial" disabled>Enviar</button>
                         </div>
                     </div>
                 </div>
-            </section>
-
-            <!-- Recent Builds -->
-            <section class="card recent-builds" id="recentBuilds">
-                <div class="card-header">
-                    <h2>🕐 Builds Recentes</h2>
-                </div>
-                <div class="card-body">
-                    <div class="builds-list" id="buildsList">
-                        <p class="empty-state">Nenhum build recente</p>
-                    </div>
-                </div>
-            </section>
+            </div>
         </main>
+    </div>
 
-        <!-- Footer -->
-        <footer class="footer">
-            <p>ESP32 Web Flasher © 2025 - Powered by ESP-IDF & Web Serial API</p>
-        </footer>
+    <!-- Modals -->
+    <div class="modal" id="targetModal" style="display: none;">
+        <div class="modal-content">
+            <h2>🎯 Selecionar Target</h2>
+            <p>Escolha o chip ESP32 de destino:</p>
+            <div class="target-grid">
+                <button class="target-option" data-target="esp32">
+                    <span class="chip-icon">📦</span>
+                    <span class="chip-name">ESP32</span>
+                    <span class="chip-desc">Xtensa LX6 Dual-core</span>
+                </button>
+                <button class="target-option" data-target="esp32s2">
+                    <span class="chip-icon">📦</span>
+                    <span class="chip-name">ESP32-S2</span>
+                    <span class="chip-desc">Xtensa LX7 Single-core</span>
+                </button>
+                <button class="target-option" data-target="esp32s3">
+                    <span class="chip-icon">📦</span>
+                    <span class="chip-name">ESP32-S3</span>
+                    <span class="chip-desc">Xtensa LX7 Dual-core + AI</span>
+                </button>
+                <button class="target-option" data-target="esp32c3">
+                    <span class="chip-icon">📦</span>
+                    <span class="chip-name">ESP32-C3</span>
+                    <span class="chip-desc">RISC-V Single-core</span>
+                </button>
+                <button class="target-option" data-target="esp32c6">
+                    <span class="chip-icon">📦</span>
+                    <span class="chip-name">ESP32-C6</span>
+                    <span class="chip-desc">RISC-V + WiFi 6</span>
+                </button>
+                <button class="target-option" data-target="esp32h2">
+                    <span class="chip-icon">📦</span>
+                    <span class="chip-name">ESP32-H2</span>
+                    <span class="chip-desc">RISC-V + Thread/Zigbee</span>
+                </button>
+            </div>
+            <button class="btn btn-outline" id="closeTargetModal">Cancelar</button>
+        </div>
     </div>
 
     <script src="app.js"></script>
