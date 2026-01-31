@@ -749,43 +749,94 @@ async function savePartitions() {
 // Serial Monitor
 // ============================================
 
+let isSerialConnecting = false;
+
 async function toggleSerial() {
     const btn = document.getElementById('connectSerial');
+
+    if (isSerialConnecting) {
+        appendMonitor('⏳ Aguarde, operação em andamento...\n');
+        return;
+    }
 
     if (serialPort) {
         await disconnectSerial();
         btn.textContent = '🔌 Conectar';
     } else {
         await connectSerial();
-        btn.textContent = '🔌 Desconectar';
     }
 }
 
 async function connectSerial() {
     if (!('serial' in navigator)) {
         appendMonitor('❌ Web Serial API não suportada neste navegador!\n');
+        appendMonitor('💡 Use Chrome, Edge ou Opera para acessar o monitor serial.\n');
         return;
     }
 
+    isSerialConnecting = true;
+    const btn = document.getElementById('connectSerial');
+
     try {
+        // Se já temos uma porta, verificar se está aberta
+        if (serialPort) {
+            try {
+                // Tentar fechar primeiro se já existir
+                if (serialReader) {
+                    await serialReader.cancel().catch(() => { });
+                    serialReader = null;
+                }
+                await serialPort.close().catch(() => { });
+            } catch (e) {
+                // Ignorar erros ao fechar
+            }
+            serialPort = null;
+        }
+
+        // Solicitar nova porta
         serialPort = await navigator.serial.requestPort();
         const baudRate = parseInt(document.getElementById('baudRate').value);
 
+        // Verificar se a porta já está aberta
+        if (serialPort.readable) {
+            appendMonitor('⚠️ Porta já estava aberta, reconectando...\n');
+            try {
+                await serialPort.close();
+            } catch (e) {
+                // Ignorar
+            }
+        }
+
+        // Abrir a porta
         await serialPort.open({ baudRate });
 
         document.getElementById('serialInput').disabled = false;
         document.getElementById('sendSerial').disabled = false;
         document.getElementById('connectionStatus').innerHTML = '<span class="dot online"></span><span>Conectado</span>';
+        btn.textContent = '🔌 Desconectar';
 
         appendMonitor(`✅ Conectado! Baud rate: ${baudRate}\n`);
+        appendMonitor('📟 Aguardando dados...\n\n');
 
         // Start reading
         readSerial();
 
     } catch (err) {
-        if (err.name !== 'NotFoundError') {
+        serialPort = null;
+        if (err.name === 'NotFoundError') {
+            // Usuário cancelou
+            appendMonitor('ℹ️ Seleção de porta cancelada.\n');
+        } else if (err.message.includes('already open')) {
+            appendMonitor('⚠️ Porta já está aberta. Tentando reconectar...\n');
+            // Forçar reset
+            serialPort = null;
+            serialReader = null;
+        } else {
             appendMonitor(`❌ Erro ao conectar: ${err.message}\n`);
         }
+        btn.textContent = '🔌 Conectar';
+    } finally {
+        isSerialConnecting = false;
     }
 }
 
@@ -793,12 +844,15 @@ async function readSerial() {
     const decoder = new TextDecoder();
 
     while (serialPort?.readable) {
-        serialReader = serialPort.readable.getReader();
-
         try {
+            serialReader = serialPort.readable.getReader();
+
             while (true) {
                 const { value, done } = await serialReader.read();
-                if (done) break;
+                if (done) {
+                    serialReader.releaseLock();
+                    break;
+                }
 
                 let text = decoder.decode(value);
 
@@ -810,29 +864,56 @@ async function readSerial() {
                 appendMonitor(text);
             }
         } catch (err) {
-            // Port closed or error
+            // Port closed or error - this is expected when disconnecting
+            if (err.name !== 'NetworkError') {
+                console.log('Serial read ended:', err.message);
+            }
         } finally {
-            serialReader.releaseLock();
+            if (serialReader) {
+                try {
+                    serialReader.releaseLock();
+                } catch (e) {
+                    // Ignore
+                }
+            }
         }
+        break; // Exit loop after reader is done
     }
 }
 
 async function disconnectSerial() {
-    if (serialReader) {
-        await serialReader.cancel();
-        serialReader = null;
-    }
+    const btn = document.getElementById('connectSerial');
 
-    if (serialPort) {
-        await serialPort.close();
+    try {
+        if (serialReader) {
+            await serialReader.cancel().catch(() => { });
+            serialReader = null;
+        }
+
+        if (serialPort) {
+            // Aguardar um pouco para garantir que o reader foi liberado
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            try {
+                await serialPort.close();
+            } catch (e) {
+                // Porta pode já estar fechada
+            }
+            serialPort = null;
+        }
+
+        document.getElementById('serialInput').disabled = true;
+        document.getElementById('sendSerial').disabled = true;
+        document.getElementById('connectionStatus').innerHTML = '<span class="dot offline"></span><span>Desconectado</span>';
+
+        appendMonitor('\n🔌 Desconectado\n');
+    } catch (err) {
+        appendMonitor(`⚠️ Erro ao desconectar: ${err.message}\n`);
+    } finally {
         serialPort = null;
+        serialReader = null;
+        btn.textContent = '🔌 Conectar';
     }
-
-    document.getElementById('serialInput').disabled = true;
-    document.getElementById('sendSerial').disabled = true;
-    document.getElementById('connectionStatus').innerHTML = '<span class="dot offline"></span><span>Desconectado</span>';
-
-    appendMonitor('\n🔌 Desconectado\n');
 }
 
 async function sendSerialData() {
