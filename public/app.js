@@ -10,6 +10,8 @@ let monacoEditor = null;
 let openFiles = new Map();
 let serialPort = null;
 let serialReader = null;
+let isBuildComplete = false;  // Rastrear se build foi concluído
+let isBuildInProgress = false;  // Rastrear se build está em andamento
 
 // ============================================
 // Initialization
@@ -76,10 +78,10 @@ function initEventListeners() {
 
     // Actions
     document.getElementById('btnSetTarget').addEventListener('click', showTargetModal);
-    document.getElementById('btnBuild').addEventListener('click', buildProject);
-    document.getElementById('btnQuickBuild').addEventListener('click', buildProject);
+    document.getElementById('btnBuild').addEventListener('click', () => buildProject(false));
+    document.getElementById('btnQuickBuild').addEventListener('click', () => buildProject(false));
     document.getElementById('btnClean').addEventListener('click', cleanProject);
-    document.getElementById('btnFlash').addEventListener('click', () => switchTab('flash'));
+    document.getElementById('btnFlash').addEventListener('click', handleFlashClick);
     document.getElementById('btnMonitor').addEventListener('click', () => switchTab('monitor'));
 
     // Analysis
@@ -257,12 +259,23 @@ function enableButtons() {
 // Build & Commands
 // ============================================
 
-async function buildProject() {
-    if (!currentProject) return;
+async function buildProject(autoFlashAfter = false) {
+    if (!currentProject) {
+        appendTerminal('❌ Nenhum projeto carregado!\n', 'error');
+        return false;
+    }
+
+    if (isBuildInProgress) {
+        appendTerminal('⏳ Build já em andamento...\n', 'info');
+        return false;
+    }
 
     const target = document.getElementById('targetSelect').value;
+    isBuildInProgress = true;
+    isBuildComplete = false;
     updateStatus('Compilando...', 'building');
     clearTerminal();
+    switchTab('terminal');
     appendTerminal(`🔧 Iniciando build para ${target}...\n\n`, 'info');
 
     try {
@@ -276,15 +289,19 @@ async function buildProject() {
         currentBuildId = data.buildId;
 
         // Poll for completion
-        pollBuildStatus(data.buildId);
+        return new Promise((resolve) => {
+            pollBuildStatus(data.buildId, autoFlashAfter, resolve);
+        });
 
     } catch (err) {
         appendTerminal(`❌ Erro: ${err.message}\n`, 'error');
         updateStatus('Erro', 'error');
+        isBuildInProgress = false;
+        return false;
     }
 }
 
-async function pollBuildStatus(buildId) {
+async function pollBuildStatus(buildId, autoFlashAfter = false, resolve = null) {
     const interval = setInterval(async () => {
         try {
             const response = await fetch(`${API_BASE}/api/build/${buildId}`);
@@ -292,11 +309,23 @@ async function pollBuildStatus(buildId) {
 
             if (build.status === 'success') {
                 clearInterval(interval);
+                isBuildComplete = true;
+                isBuildInProgress = false;
                 updateStatus('Build OK', 'success');
                 updateFlashUI(build);
+
+                if (autoFlashAfter) {
+                    appendTerminal('\n✅ Build concluído! Abrindo Flash...\n', 'success');
+                    setTimeout(() => switchTab('flash'), 1000);
+                }
+
+                if (resolve) resolve(true);
             } else if (build.status === 'failed') {
                 clearInterval(interval);
+                isBuildInProgress = false;
+                isBuildComplete = false;
                 updateStatus('Build Falhou', 'error');
+                if (resolve) resolve(false);
             }
         } catch (err) {
             // Continue polling
@@ -304,11 +333,37 @@ async function pollBuildStatus(buildId) {
     }, 2000);
 }
 
+// Handler para clique no botão Flash
+async function handleFlashClick() {
+    if (!currentProject) {
+        appendTerminal('❌ Nenhum projeto carregado!\n', 'error');
+        return;
+    }
+
+    // Se build está em andamento, aguardar
+    if (isBuildInProgress) {
+        appendTerminal('⏳ Aguarde o build em andamento...\n', 'info');
+        return;
+    }
+
+    // Se não tem build, fazer build primeiro
+    if (!isBuildComplete || !lastBuildId) {
+        appendTerminal('📦 Projeto não compilado. Iniciando build primeiro...\n', 'info');
+        const success = await buildProject(true);  // true = auto ir para flash depois
+        return;
+    }
+
+    // Se já tem build, ir direto para flash
+    switchTab('flash');
+}
+
 async function cleanProject() {
     if (!currentProject) return;
 
     updateStatus('Limpando...', 'building');
     appendTerminal(`🧹 Limpando projeto...\n`, 'info');
+    isBuildComplete = false;  // Reset build status
+    lastBuildId = null;
 
     try {
         const response = await fetch(`${API_BASE}/api/project/${currentProject.id}/fullclean`, {
