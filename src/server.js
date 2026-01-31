@@ -30,8 +30,21 @@ const PROJECTS_DIR = process.env.PROJECTS_DIR || path.join(__dirname, '../projec
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
+
+// Servir arquivos estáticos com headers CORS para ESP Web Tools
+app.use('/builds', (req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    next();
+}, express.static(BUILD_DIR));
+
 app.use(express.static(path.join(__dirname, '../public')));
 
 // Configuração do Multer para upload

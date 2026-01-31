@@ -118,6 +118,9 @@ function initEventListeners() {
         if (e.key === 'Enter') sendSerialData();
     });
 
+    // Flash
+    document.getElementById('testManifest').addEventListener('click', testManifestUrl);
+
     // Target Modal
     document.getElementById('closeTargetModal').addEventListener('click', hideTargetModal);
     document.querySelectorAll('.target-option').forEach(btn => {
@@ -131,6 +134,42 @@ function initEventListeners() {
     document.getElementById('toggleSidebar').addEventListener('click', () => {
         document.getElementById('sidebar').classList.toggle('collapsed');
     });
+}
+
+// Test manifest URL
+async function testManifestUrl() {
+    if (!lastBuildManifest) {
+        appendTerminal('❌ Nenhum manifest disponível. Faça build primeiro.\n', 'error');
+        return;
+    }
+
+    appendTerminal(`🔗 Testando manifest: ${lastBuildManifest}\n`, 'info');
+
+    try {
+        const response = await fetch(lastBuildManifest);
+        if (response.ok) {
+            const manifest = await response.json();
+            appendTerminal(`✅ Manifest válido!\n`, 'success');
+            appendTerminal(`   Nome: ${manifest.name}\n`, 'info');
+            appendTerminal(`   Chip: ${manifest.builds[0].chipFamily}\n`, 'info');
+            appendTerminal(`   Partes: ${manifest.builds[0].parts.length}\n`, 'info');
+            manifest.builds[0].parts.forEach(p => {
+                appendTerminal(`     - ${p.path} @ 0x${p.offset.toString(16)}\n`, 'stdout');
+            });
+        } else {
+            appendTerminal(`❌ Erro ao acessar manifest: ${response.status} ${response.statusText}\n`, 'error');
+        }
+    } catch (err) {
+        appendTerminal(`❌ Erro: ${err.message}\n`, 'error');
+    }
+}
+
+// Update flash warning when serial connects/disconnects
+function updateFlashWarning() {
+    const warning = document.getElementById('flashWarning');
+    if (warning) {
+        warning.style.display = serialPort ? 'block' : 'none';
+    }
 }
 
 // ============================================
@@ -336,6 +375,8 @@ async function selectTarget(target) {
 // Flash UI
 // ============================================
 
+let lastBuildManifest = null;
+
 function updateFlashUI(build) {
     if (!build.binaries) return;
 
@@ -353,13 +394,31 @@ function updateFlashUI(build) {
         grid.appendChild(item);
     });
 
-    // Setup ESP Web Tools
+    // Setup ESP Web Tools with correct absolute URL
     if (build.manifestUrl) {
+        // Construir URL absoluta para o manifest
+        const manifestFullUrl = new URL(build.manifestUrl, window.location.origin).href;
+        lastBuildManifest = manifestFullUrl;
+
+        console.log('Manifest URL:', manifestFullUrl);
+
         const flashButtons = document.querySelectorAll('esp-web-install-button');
         flashButtons.forEach(btn => {
-            btn.manifest = build.manifestUrl;
+            btn.setAttribute('manifest', manifestFullUrl);
             btn.style.display = 'inline-block';
+
+            // Adicionar listener para desconectar serial antes de flashar
+            btn.addEventListener('click', async (e) => {
+                if (serialPort) {
+                    appendTerminal('⚠️ Desconectando monitor serial para flash...\n', 'info');
+                    await disconnectSerial();
+                    // Pequeno delay para garantir que a porta foi liberada
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }, { once: false });
         });
+
+        appendTerminal(`📦 Flash pronto! Manifest: ${manifestFullUrl}\n`, 'success');
     }
 }
 
@@ -818,6 +877,9 @@ async function connectSerial() {
         appendMonitor(`✅ Conectado! Baud rate: ${baudRate}\n`);
         appendMonitor('📟 Aguardando dados...\n\n');
 
+        // Atualizar aviso de flash
+        updateFlashWarning();
+
         // Start reading
         readSerial();
 
@@ -913,6 +975,7 @@ async function disconnectSerial() {
         serialPort = null;
         serialReader = null;
         btn.textContent = '🔌 Conectar';
+        updateFlashWarning();
     }
 }
 

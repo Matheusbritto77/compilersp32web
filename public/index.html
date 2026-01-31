@@ -248,9 +248,13 @@ Para começar, faça upload de um projeto ESP-IDF (.zip)
                             </div>
                             <div class="flash-section">
                                 <h3>🔌 Conexão</h3>
-                                <div class="connection-status" id="connectionStatus">
+                                <div class="flash-warning" id="flashWarning" style="display: none;">
+                                    <span>⚠️ Monitor Serial está conectado. Será desconectado automaticamente antes do
+                                        flash.</span>
+                                </div>
+                                <div class="connection-status" id="flashConnectionStatus">
                                     <span class="dot offline"></span>
-                                    <span>Desconectado</span>
+                                    <span>Pronto para flash</span>
                                 </div>
                                 <div class="flash-options">
                                     <label>
@@ -262,11 +266,24 @@ Para começar, faça upload de um projeto ESP-IDF (.zip)
                                         Verificar após gravar
                                     </label>
                                 </div>
-                                <esp-web-install-button id="mainFlashButton">
-                                    <button slot="activate" class="btn btn-success btn-large">
-                                        ⚡ Gravar no ESP32
+                                <div class="flash-buttons">
+                                    <esp-web-install-button id="mainFlashButton">
+                                        <button slot="activate" class="btn btn-success btn-large">
+                                            ⚡ Gravar no ESP32
+                                        </button>
+                                    </esp-web-install-button>
+                                    <button class="btn btn-outline" id="testManifest" style="margin-left: 10px;">
+                                        🔗 Testar Manifest
                                     </button>
-                                </esp-web-install-button>
+                                </div>
+                                <div class="flash-help" style="margin-top: 16px;">
+                                    <p style="color: var(--text-muted); font-size: 12px;">
+                                        💡 <strong>Dicas:</strong><br>
+                                        • Certifique-se que o ESP32 está conectado via USB<br>
+                                        • Feche outros programas que usam a porta serial<br>
+                                        • Pressione BOOT no ESP32 se necessário
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
